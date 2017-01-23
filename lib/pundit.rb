@@ -109,8 +109,8 @@ module Pundit
     # @param record [Object] the object we're retrieving the policy for
     # @raise [NotDefinedError] if the policy cannot be found
     # @return [Object] instance of policy class with query methods
-    def policy!(user, record)
-      PolicyFinder.new(record).policy!.new(user, record)
+    def policy!(user, record, role)
+      PolicyFinder.new(record).policy!.new(user, record, role)
     end
   end
 
@@ -127,6 +127,7 @@ module Pundit
       helper_method :policy
       helper_method :pundit_policy_scope
       helper_method :pundit_user
+      helper_method :pundit_role
     end
   end
 
@@ -175,12 +176,12 @@ protected
   #   If omitted then this defaults to the Rails controller action name.
   # @raise [NotAuthorizedError] if the given query method returned false
   # @return [Object] Always returns the passed object record
-  def authorize(record, query = nil)
+  def authorize(record, query = nil, role=pundit_role)
     query ||= params[:action].to_s + "?"
 
     @_pundit_policy_authorized = true
 
-    policy = policy(record)
+    policy = policy(record, role)
 
     unless policy.public_send(query)
       raise NotAuthorizedError, query: query, record: record, policy: policy
@@ -220,8 +221,8 @@ protected
   # @see https://github.com/elabs/pundit#policies
   # @param record [Object] the object we're retrieving the policy for
   # @return [Object, nil] instance of policy class with query methods
-  def policy(record)
-    policies[record] ||= Pundit.policy!(pundit_user, record)
+  def policy(record, role=pundit_role)
+    policies[record] ||= Pundit.policy!(pundit_user, record, role)
   end
 
   # Retrieves a set of permitted attributes from the policy by instantiating
@@ -267,6 +268,10 @@ protected
   # @return [Object] the user object to be used with pundit
   def pundit_user
     current_user
+  end
+
+  def pundit_role
+    current_role
   end
 
 private
