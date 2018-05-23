@@ -93,9 +93,9 @@ module Pundit
     # @raise [NotDefinedError] if the policy scope cannot be found
     # @raise [InvalidConstructorError] if the policy constructor called incorrectly
     # @return [Scope{#resolve}] instance of scope class which can resolve to a scope
-    def policy_scope!(user, scope)
+    def policy_scope!(user, scope, interface)
       policy_scope = PolicyFinder.new(scope).scope!
-      policy_scope.new(user, scope).resolve
+      policy_scope.new(user, scope, interface).resolve
     rescue ArgumentError
       raise InvalidConstructorError, "Invalid #<#{policy_scope}> constructor is called"
     end
@@ -122,9 +122,9 @@ module Pundit
     # @raise [NotDefinedError] if the policy cannot be found
     # @raise [InvalidConstructorError] if the policy constructor called incorrectly
     # @return [Object] instance of policy class with query methods
-    def policy!(user, record)
+    def policy!(user, record, interface)
       policy = PolicyFinder.new(record).policy!
-      policy.new(user, record)
+      policy.new(user, record, interface)
     rescue ArgumentError
       raise InvalidConstructorError, "Invalid #<#{policy}> constructor is called"
     end
@@ -143,6 +143,7 @@ module Pundit
       helper_method :policy
       helper_method :pundit_policy_scope
       helper_method :pundit_user
+      helper_method :pundit_interface
     end
   end
 
@@ -191,12 +192,12 @@ protected
   #   If omitted then this defaults to the Rails controller action name.
   # @raise [NotAuthorizedError] if the given query method returned false
   # @return [Object] Always returns the passed object record
-  def authorize(record, query = nil)
+  def authorize(record, query = nil, interface=pundit_interface)
     query ||= "#{action_name}?"
 
     @_pundit_policy_authorized = true
 
-    policy = policy(record)
+    policy = policy(record, interface)
 
     raise NotAuthorizedError, query: query, record: record, policy: policy unless policy.public_send(query)
 
@@ -234,8 +235,8 @@ protected
   # @see https://github.com/elabs/pundit#policies
   # @param record [Object] the object we're retrieving the policy for
   # @return [Object, nil] instance of policy class with query methods
-  def policy(record)
-    policies[record] ||= Pundit.policy!(pundit_user, record)
+  def policy(record, interface=pundit_interface)
+    policies[record] ||= Pundit.policy!(pundit_user, record, interface)
   end
 
   # Retrieves a set of permitted attributes from the policy by instantiating
@@ -294,9 +295,13 @@ protected
     current_user
   end
 
+  def pundit_interface
+    current_interface
+  end
+
 private
 
   def pundit_policy_scope(scope)
-    policy_scopes[scope] ||= Pundit.policy_scope!(pundit_user, scope)
+    policy_scopes[scope] ||= Pundit.policy_scope!(pundit_user, scope, pundit_interface)
   end
 end
